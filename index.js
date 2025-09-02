@@ -57,23 +57,23 @@ app.get('/home', checkAuth,(req, res) => {
     res.render('home');
 });
 
+// Register Route
 app.post('/register', async (req, res) => {
-    const { username, email, password } = req.body;
+    const { username, email, password, usertype } = req.body;
     
     try {
         let user = await User.findOne({ email });
         if (user) {
-            return res.redirect('/register'); // You can add flash messages later for better UX
+            return res.redirect('/register');
         }
 
         const hashedPassword = await bcrypt.hash(password, 12);
         user = new User({
             username,
             email,
-            password: hashedPassword
+            password: hashedPassword,
+            usertype
         });
-
-        req.session.person =user.username
 
         await user.save();
         res.redirect('/login');
@@ -82,6 +82,7 @@ app.post('/register', async (req, res) => {
         res.status(500).send("Server error");
     }
 });
+
 
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
@@ -94,15 +95,46 @@ app.post('/login', async (req, res) => {
 
         const checkPassword = await bcrypt.compare(password, user.password);
         if (!checkPassword) {
-            return res.redirect('/login'); // changed from '/signup' to '/login'
+            return res.redirect('/login');
         }
+
+        // Save session
         req.session.isAuthenticated = true;
-        res.redirect('/home');
+        req.session.user = {
+            id: user._id,
+            username: user.username,
+            usertype: user.usertype
+        };
+
+        // Redirect based on role
+        if (user.usertype === "admin") {
+            res.redirect('/admin');
+        } else {
+            res.redirect('/homeuser');
+        }
+
     } catch (err) {
         console.error("Login error:", err);
         res.status(500).send("Server error");
     }
 });
+
+app.get('/homeuser', checkAuth, (req, res) => {
+    if (req.session.user.usertype === "user") {
+        res.render('homeuser');
+    } else {
+        res.redirect('/admin');
+    }
+});
+
+app.get('/admin', checkAuth, (req, res) => {
+    if (req.session.user.usertype === "admin") {
+        res.render('adminuser');
+    } else {
+        res.redirect('/homeuser');
+    }
+});
+
 
 app.get('/logout', (req, res) => {
     req.session.destroy(err => {
@@ -110,7 +142,7 @@ app.get('/logout', (req, res) => {
             console.error("Logout error:", err);
             return res.status(500).send("Logout failed");
         }
-        res.redirect('/login');
+        res.redirect('/');
     });
 });
 
@@ -118,13 +150,13 @@ app.get('/logout', (req, res) => {
 // DB Connection + Server
 mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
     .then(() => {
-        console.log("Connected to MongoDB");
+        console.log("✅ Successfully connected to MongoDB!");
     })
     .catch(err => {
         console.error("MongoDB connection error:", err);
     });
 
 const port = process.env.PORT || 5000;
-app.listen(port,()=>{
-    console.log("Server is running on port " + port);
-})
+app.listen(port, () => {
+    console.log(`🚀 Server is running at 👉 http://localhost:${port}`);
+});
