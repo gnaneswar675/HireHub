@@ -105,7 +105,7 @@ app.post('/login', async (req, res) => {
             username: user.username,
             usertype: user.usertype
         };
-
+ 
         // Redirect based on role
         if (user.usertype === "admin") {
             res.redirect('/admin');
